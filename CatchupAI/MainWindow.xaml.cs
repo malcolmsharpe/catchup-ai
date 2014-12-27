@@ -93,12 +93,17 @@ namespace CatchupAI
 
         private void display()
         {
+            currentPlayerCircle.Fill =
+                game.isGameOver() ? brushEmpty
+                : game.getCurrentPlayer() == 0 ? brushP1
+                : brushP2;
+
             for (int x = 0; x <= 2 * Game.S - 2; ++x)
             {
                 for (int y = 0; y <= 2 * Game.S - 2; ++y)
                 {
                     if (!Game.inBounds(x, y)) continue;
-                    var stone = game.query(x, y);
+                    var stone = game.getStone(x, y);
                     if (prevDisplay[x, y] != stone)
                     {
                         prevDisplay[x, y] = stone;
@@ -118,6 +123,35 @@ namespace CatchupAI
                     }
                 }
             }
+
+            passButton.IsEnabled = game.getMayPass();
+
+            var score = game.getScore();
+            var statusText = new StringBuilder();
+
+            if (game.isGameOver())
+            {
+                statusText.Append("Game is over");
+            } else {
+                statusText.Append(game.getCurrentPlayer() == 0 ? "Black" : "White");
+                statusText.Append(" to play ");
+                statusText.Append(game.getRemainingPlays());
+                statusText.Append(" stones");
+            }
+            statusText.Append("\n\n");
+
+            for (int p = 0; p < 2; ++p)
+            {
+                if (p != 0) statusText.Append("\n");
+                statusText.Append(p == 0 ? "Black" : "White");
+                statusText.Append(":  ");
+                for (int s = 0; s < score[p].Count; ++s)
+                {
+                    if (s != 0) statusText.Append(", ");
+                    statusText.Append(score[p][s]);
+                }
+            }
+            statusBox.Text = statusText.ToString();
         }
 
         private void newGameMenu_Click(object sender, RoutedEventArgs e)
@@ -129,6 +163,12 @@ namespace CatchupAI
         {
             var pos = decodePos(((Rectangle)sender).Tag);
             game.userPlay(pos.Item1, pos.Item2);
+            display();
+        }
+
+        private void passButton_Click(object sender, RoutedEventArgs e)
+        {
+            game.userPass();
             display();
         }
     }

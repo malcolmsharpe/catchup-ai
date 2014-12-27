@@ -8,24 +8,24 @@ namespace CatchupAI
 {
     class FastUnion
     {
-        private int[] setParent;
-        private int[] setSize;
+        private int[] parent;
+        private int[] size;
 
         public FastUnion(int slots)
         {
-            setParent = new int[slots];
-            setSize = new int[slots];
+            parent = new int[slots];
+            size = new int[slots];
             for (int i = 0; i < slots; ++i)
             {
-                setParent[i] = i;
-                setSize[i] = 1;
+                parent[i] = i;
+                size[i] = 1;
             }
         }
 
         public int find(int i)
         {
-            if (setParent[i] == i) return i;
-            return setParent[i] = find(setParent[i]);
+            if (parent[i] == i) return i;
+            return parent[i] = find(parent[i]);
         }
 
         public int join(int i, int j)
@@ -34,22 +34,28 @@ namespace CatchupAI
             j = find(j);
             if (i == j) return i;
 
-            if (setSize[i] < setSize[j])
+            if (size[i] < size[j])
             {
                 int t = i;
                 i = j;
                 j = t;
             }
 
-            setParent[j] = i;
-            setSize[i] += setSize[j];
+            parent[j] = i;
+            size[i] += size[j];
             return i;
         }
 
         public int querySize(int i)
         {
             i = find(i);
-            return setSize[i];
+            return size[i];
+        }
+
+        public int representativeSize(int i)
+        {
+            if (parent[i] == i) return size[i];
+            return 0;
         }
     }
 }
