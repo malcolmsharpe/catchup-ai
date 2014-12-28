@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace CatchupAI
 {
-    class Player
+    interface IPlayer
     {
+        void play(Game game);
     }
 }

@@ -36,18 +36,20 @@ namespace CatchupAI
         {
             InitializeComponent();
 
+            game = new Game();
+
             hexes = new Rectangle[2 * Game.S - 1, 2 * Game.S - 1];
             prevDisplay = new Game.Stone[2 * Game.S - 1, 2 * Game.S - 1];
-            for (int x = 0; x <= 2 * Game.S - 2; ++x)
+            for (int x = 0; x < Game.maxX; ++x)
             {
-                for (int y = 0; y <= 2 * Game.S - 2; ++y)
+                for (int y = 0; y < Game.maxY; ++y)
                 {
                     if (!Game.inBounds(x, y)) continue;
                     hexes[x, y] = putHex(x, y);
                 }
             }
 
-            newGame();
+            display();
         }
 
         private void newGame()
@@ -69,26 +71,13 @@ namespace CatchupAI
                 topPad + Q * y, // top
                 0, // right
                 0); // bottom
-            rect.Tag = encodePos(x, y);
+            rect.Tag = game.toLoc(x, y);
             rect.MouseUp += new MouseButtonEventHandler(this.hex_MouseUp);
 
             Grid.SetRow(rect, 1);
             mainGrid.Children.Add(rect);
 
             return rect;
-        }
-
-        private object encodePos(int x, int y)
-        {
-            return y * (2 * Game.S - 1) + x;
-        }
-
-        private Tuple<int, int> decodePos(object tag)
-        {
-            int t = (int)tag;
-            int x = t % (2 * Game.S - 1);
-            int y = t / (2 * Game.S - 1);
-            return Tuple.Create(x, y);
         }
 
         private void display()
@@ -98,9 +87,9 @@ namespace CatchupAI
                 : game.getCurrentPlayer() == 0 ? brushP1
                 : brushP2;
 
-            for (int x = 0; x <= 2 * Game.S - 2; ++x)
+            for (int x = 0; x < Game.maxX; ++x)
             {
-                for (int y = 0; y <= 2 * Game.S - 2; ++y)
+                for (int y = 0; y < Game.maxY; ++y)
                 {
                     if (!Game.inBounds(x, y)) continue;
                     var stone = game.getStone(x, y);
@@ -161,8 +150,9 @@ namespace CatchupAI
 
         private void hex_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            var pos = decodePos(((Rectangle)sender).Tag);
-            game.userPlay(pos.Item1, pos.Item2);
+            int x, y;
+            game.fromLoc((int)((Rectangle)sender).Tag, out x, out y);
+            game.userPlay(x, y);
             display();
         }
 
