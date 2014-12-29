@@ -13,32 +13,12 @@ namespace CatchupAI
 
         public void play(Game game)
         {
-            List<int> empties = new List<int>();
+            List<int> legals = game.getLegalMoves(true);
 
-            for (int x = 0; x < Game.maxX; ++x)
-            {
-                for (int y = 0; y < Game.maxY; ++y)
-                {
-                    if (!Game.inBounds(x, y)) continue;
+            int idx = rng.Next(legals.Count);
+            int loc = legals[idx];
 
-                    if (game.getStone(x, y) != Game.Stone.Empty) continue;
-                    empties.Add(game.toLoc(x, y));
-                }
-            }
-
-            if (game.getMayPass()) empties.Add(-1);
-
-            int idx = rng.Next(empties.Count);
-            int loc = empties[idx];
-
-            if (loc == -1)
-            {
-                game.pass();
-            }
-            else
-            {
-                game.play(loc);
-            }
+            game.ApplyMove(loc);
         }
     }
 }

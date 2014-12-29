@@ -36,7 +36,7 @@ namespace CatchupAI
         {
             InitializeComponent();
 
-            game = new Game();
+            initGame();
 
             hexes = new Rectangle[2 * Game.S - 1, 2 * Game.S - 1];
             prevDisplay = new Game.Stone[2 * Game.S - 1, 2 * Game.S - 1];
@@ -52,9 +52,18 @@ namespace CatchupAI
             display();
         }
 
+        private void initGame()
+        {
+            // TODO: Replace this with configuration.
+            var players = new IPlayer[2];
+            players[1] = new MCTSAI();
+
+            game = new Game(players);
+        }
+
         private void newGame()
         {
-            game = new Game();
+            initGame();
             display();
         }
 

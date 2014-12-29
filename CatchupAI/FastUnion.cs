@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -56,6 +57,13 @@ namespace CatchupAI
         {
             if (parent[i] == i) return size[i];
             return 0;
+        }
+
+        public void CopyTo(FastUnion fu)
+        {
+            Debug.Assert(parent.Length == fu.parent.Length);
+            parent.CopyTo(fu.parent, 0);
+            size.CopyTo(fu.size, 0);
         }
     }
 }

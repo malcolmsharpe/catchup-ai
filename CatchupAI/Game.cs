@@ -33,12 +33,14 @@ namespace CatchupAI
         FastUnion fu;
 
         public Game()
+            : this(new IPlayer[2])
+        {
+        }
+
+        public Game(IPlayer[] players)
         {
             stones = new Stone[maxX, maxY];
-            players = new IPlayer[2];
-
-            // TODO: Replace this with configuration.
-            players[0] = new RandomAI();
+            this.players = players;
 
             currentPlayer = 0;
             remainingPlays = 1;
@@ -51,6 +53,25 @@ namespace CatchupAI
             fu = new FastUnion(locLen);
 
             maybeRequestPlay();
+        }
+
+        // Copy state to the other game, but not players.
+        public void CopyTo(Game game)
+        {
+            game.locLen = locLen;
+            for (int x = 0; x < maxX; ++x)
+            {
+                for (int y = 0; y < maxY; ++y)
+                {
+                    game.stones[x, y] = stones[x, y];
+                }
+            }
+            game.currentPlayer = currentPlayer;
+            game.remainingPlays = remainingPlays;
+            game.triggerCatchup = triggerCatchup;
+            game.catchupThreshold = catchupThreshold;
+            game.emptyHexes = emptyHexes;
+            fu.CopyTo(game.fu);
         }
 
         public Stone getStone(int x, int y)
@@ -75,6 +96,19 @@ namespace CatchupAI
             y = loc / (2 * Game.S - 1);
         }
 
+        public void ApplyMove(int loc)
+        {
+            Debug.Assert(0 <= loc && loc <= locLen);
+            if (loc == locLen)
+            {
+                pass();
+            }
+            else
+            {
+                play(loc);
+            }
+        }
+
         public void userPlay(int x, int y)
         {
             if (players[currentPlayer] != null) return;
@@ -90,21 +124,21 @@ namespace CatchupAI
             pass();
         }
 
-        public void pass()
+        private void pass()
         {
             Debug.Assert(getMayPass());
             endTurn();
             maybeRequestPlay();
         }
 
-        public void play(int loc)
+        private void play(int loc)
         {
             int x, y;
             fromLoc(loc, out x, out y);
             play(x, y);
         }
 
-        public void play(int x, int y)
+        private void play(int x, int y)
         {
             Debug.Assert(stones[x, y] == Stone.Empty);
 
@@ -219,9 +253,47 @@ namespace CatchupAI
             return ret;
         }
 
+        public int GetWinner()
+        {
+            Debug.Assert(isGameOver());
+
+            List<int>[] score = getScore();
+
+            for (int i = 0; ; ++i)
+            {
+                Debug.Assert(i < score[0].Count || i < score[1].Count);
+                if (i == score[0].Count) return 1;
+                if (i == score[1].Count) return 0;
+
+                if (score[0][i] < score[1][i]) return 1;
+                if (score[0][i] > score[1][i]) return 0;
+            }
+        }
+
         public int getRemainingPlays()
         {
             return remainingPlays;
+        }
+
+        // 'locLen' means pass
+        public List<int> getLegalMoves(bool includePass)
+        {
+            List<int> legals = new List<int>();
+
+            for (int x = 0; x < maxX; ++x)
+            {
+                for (int y = 0; y < maxY; ++y)
+                {
+                    if (!inBounds(x, y)) continue;
+
+                    if (getStone(x, y) != Stone.Empty) continue;
+                    legals.Add(toLoc(x, y));
+                }
+            }
+
+            if (includePass && getMayPass()) legals.Add(locLen);
+
+            return legals;
         }
     }
 }
