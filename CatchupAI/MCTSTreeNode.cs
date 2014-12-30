@@ -88,12 +88,16 @@ namespace CatchupAI
 
         private int simulate(Game game)
         {
+            // Get the empty hexes where moves can be made. Filling them in will finish the game.
+            List<int> emptyLocs = game.getLegalMoves(false);
+            shuffle(emptyLocs);
+
             while (!game.isGameOver())
             {
-                // TODO: Optimize this random move selection.
-                int move = popRandomMove(game.getLegalMoves(false));
-                game.ApplyMove(move);
+                Debug.Assert(emptyLocs.Count > 0);
+                game.ApplyMove(popMove(emptyLocs));
             }
+            Debug.Assert(emptyLocs.Count == 0);
 
             int outcome = 1 - game.GetWinner();
 
@@ -103,11 +107,29 @@ namespace CatchupAI
             return outcome;
         }
 
+        private static void shuffle(List<int> moves)
+        {
+            for (int i = 1; i < moves.Count; ++i)
+            {
+                int j = MCTSAI.rng.Next(0, i + 1);
+                int t = moves[i];
+                moves[i] = moves[j];
+                moves[j] = t;
+            }
+        }
+
         private static int popRandomMove(List<int> moves)
         {
             int moveIndex = MCTSAI.rng.Next(moves.Count);
             int move = moves[moveIndex];
             moves[moveIndex] = moves[moves.Count - 1];
+            moves.RemoveAt(moves.Count - 1);
+            return move;
+        }
+
+        private static int popMove(List<int> moves)
+        {
+            int move = moves[moves.Count - 1];
             moves.RemoveAt(moves.Count - 1);
             return move;
         }
