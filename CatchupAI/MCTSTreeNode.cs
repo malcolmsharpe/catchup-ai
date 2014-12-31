@@ -27,7 +27,7 @@ namespace CatchupAI
                 player = game.getCurrentPlayer();
 
                 Debug.Assert(children == null);
-                children = new MCTSTreeNode[game.locLen + 1]; // locLen means pass
+                children = new MCTSTreeNode[Game.locLen + 1]; // locLen means pass
 
                 Debug.Assert(unexpandedMoves == null);
                 unexpandedMoves = game.getLegalMoves(true);
@@ -144,25 +144,55 @@ namespace CatchupAI
             return numEvals;
         }
 
-        public int GetBestMove()
+        public bool AnyExpanded()
         {
+            return expandedMoves != null && expandedMoves.Count > 0;
+        }
+
+        // Gets best move when invert=false.
+        // Gets worst move when invert=true.
+        private int getExtremeMove(bool invert)
+        {
+            Debug.Assert(AnyExpanded());
+
             double bestSubjectiveMean = -1;
-            int bestLoc = -1;
+            int extrLoc = -1;
 
             foreach (int loc in expandedMoves)
             {
                 double mean = children[loc].GetMean();
                 if (player == 1) mean = 1 - mean;
+                if (invert) mean = 1 - mean;
 
                 if (mean > bestSubjectiveMean)
                 {
                     bestSubjectiveMean = mean;
-                    bestLoc = loc;
+                    extrLoc = loc;
                 }
             }
 
-            Debug.Assert(bestLoc != -1);
-            return bestLoc;
+            Debug.Assert(extrLoc != -1);
+            return extrLoc;
+        }
+
+        public int GetBestMove()
+        {
+            return getExtremeMove(false);
+        }
+
+        public int GetWorstMove()
+        {
+            return getExtremeMove(true);
+        }
+
+        public int GetPlayer()
+        {
+            return player;
+        }
+
+        public MCTSTreeNode GetChild(int loc)
+        {
+            return children[loc];
         }
     }
 }

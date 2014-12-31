@@ -11,11 +11,11 @@ namespace CatchupAI
     {
         public const int S = 5;
         public const int maxX = 2 * S - 1, maxY = maxX;
+        public const int locLen = maxX * maxY;
 
         public enum Stone { Empty, Black, White };
 
         private Stone[,] stones;
-        public int locLen;
 
         private IPlayer[] players;
         private int currentPlayer;
@@ -24,6 +24,7 @@ namespace CatchupAI
         private bool triggerCatchup;
         private int catchupThreshold;
         private int emptyHexes;
+        private List<int> freshMoves = new List<int>();
 
         // E, N, NW, W, S, SE
         private const int nd = 6;
@@ -49,7 +50,6 @@ namespace CatchupAI
             catchupThreshold = 1;
             emptyHexes = 3 * S * (S - 1) + 1;
 
-            locLen = toLoc(0, maxY);
             fu = new FastUnion(locLen);
 
             maybeRequestPlay();
@@ -58,7 +58,6 @@ namespace CatchupAI
         // Copy state to the other game, but not players.
         public void CopyTo(Game game)
         {
-            game.locLen = locLen;
             for (int x = 0; x < maxX; ++x)
             {
                 for (int y = 0; y < maxY; ++y)
@@ -105,8 +104,23 @@ namespace CatchupAI
             }
             else
             {
+                if (players[currentPlayer] != null)
+                {
+                    if (!mayPass)
+                    {
+                        freshMoves.Clear();
+                    }
+                    freshMoves.Add(loc);
+                }
+
                 play(loc);
             }
+        }
+
+        // This should really return an immutable list
+        public List<int> getFreshMoves()
+        {
+            return freshMoves.ToList();
         }
 
         public void userPlay(int x, int y)

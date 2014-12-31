@@ -24,8 +24,10 @@ namespace CatchupAI
         const int leftPad = Q;
         const int topPad = Q;
         Rectangle[,] hexes;
+        Label[,] labels;
         Game.Stone[,] prevDisplay;
         Game game;
+        MCTSAI aiPlayer = null;
 
         Brush brushBorder = new SolidColorBrush(Color.FromRgb(0, 0, 0));
         Brush brushEmpty = new SolidColorBrush(Color.FromRgb(150, 150, 255));
@@ -38,14 +40,16 @@ namespace CatchupAI
 
             initGame();
 
-            hexes = new Rectangle[2 * Game.S - 1, 2 * Game.S - 1];
-            prevDisplay = new Game.Stone[2 * Game.S - 1, 2 * Game.S - 1];
+            hexes = new Rectangle[Game.maxX, Game.maxY];
+            labels = new Label[Game.maxX, Game.maxY];
+            prevDisplay = new Game.Stone[Game.maxX, Game.maxY];
             for (int x = 0; x < Game.maxX; ++x)
             {
                 for (int y = 0; y < Game.maxY; ++y)
                 {
                     if (!Game.inBounds(x, y)) continue;
                     hexes[x, y] = putHex(x, y);
+                    labels[x, y] = putLabel(x, y);
                 }
             }
 
@@ -56,7 +60,7 @@ namespace CatchupAI
         {
             // TODO: Replace this with configuration.
             var players = new IPlayer[2];
-            players[1] = new MCTSAI();
+            players[1] = aiPlayer = new MCTSAI();
 
             game = new Game(players);
         }
@@ -67,6 +71,15 @@ namespace CatchupAI
             display();
         }
 
+        private Thickness hexMargin(int x, int y)
+        {
+            return new Thickness(
+                leftPad + Q * (x + 0.5 * (Game.S - 1 - y)), // left
+                topPad + Q * y, // top
+                0, // right
+                0); // bottom
+        }
+
         private Rectangle putHex(int x, int y)
         {
             var rect = new System.Windows.Shapes.Rectangle();
@@ -75,11 +88,7 @@ namespace CatchupAI
             rect.HorizontalAlignment = HorizontalAlignment.Left;
             rect.VerticalAlignment = VerticalAlignment.Top;
             rect.Height = rect.Width = Q;
-            rect.Margin = new Thickness(
-                leftPad + Q * (x + 0.5 * (Game.S - 1 - y)), // left
-                topPad + Q * y, // top
-                0, // right
-                0); // bottom
+            rect.Margin = hexMargin(x, y);
             rect.Tag = game.toLoc(x, y);
             rect.MouseUp += new MouseButtonEventHandler(this.hex_MouseUp);
 
@@ -87,6 +96,52 @@ namespace CatchupAI
             mainGrid.Children.Add(rect);
 
             return rect;
+        }
+
+        private Label putLabel(int x, int y)
+        {
+            var label = new Label();
+            label.HorizontalAlignment = HorizontalAlignment.Left;
+            label.VerticalAlignment = VerticalAlignment.Top;
+            label.IsHitTestVisible = false;
+            label.Margin = hexMargin(x, y);
+            label.Height = label.Width = Q;
+            label.HorizontalContentAlignment = HorizontalAlignment.Center;
+            label.VerticalContentAlignment = VerticalAlignment.Center;
+
+            label.FontFamily = new FontFamily("Courier New");
+            label.FontSize = 36;
+            label.FontWeight = FontWeights.Bold;
+            label.Content = "?";
+
+            Panel.SetZIndex(label, 1); // show above hexes
+
+            Grid.SetRow(label, 1);
+            mainGrid.Children.Add(label);
+
+            return label;
+        }
+
+        private void setLabelColor(int x, int y)
+        {
+            if (prevDisplay[x, y] == Game.Stone.Black)
+            {
+                labels[x, y].Foreground = Brushes.White;
+            }
+            else
+            {
+                labels[x, y].Foreground = Brushes.Black;
+            }
+        }
+
+        private void displayMoves(List<int> moves, string content)
+        {
+            foreach (int loc in moves)
+            {
+                int x, y;
+                game.fromLoc(loc, out x, out y);
+                labels[x, y].Content = content;
+            }
         }
 
         private void display()
@@ -119,7 +174,15 @@ namespace CatchupAI
                                 break;
                         }
                     }
+
+                    labels[x, y].Content = "";
                 }
+            }
+
+            if (aiPlayer != null)
+            {
+                displayMoves(game.getFreshMoves(), "+");
+                displayMoves(aiPlayer.getExpectedResponse(), "?");
             }
 
             passButton.IsEnabled = game.getMayPass();
