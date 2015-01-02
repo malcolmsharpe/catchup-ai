@@ -87,7 +87,7 @@ namespace CatchupAI
             return !isGameOver() && mayPass;
         }
 
-        public int toLoc(int x, int y)
+        public static int toLoc(int x, int y)
         {
             return y * maxX + x;
         }

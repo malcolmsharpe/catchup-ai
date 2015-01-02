@@ -35,6 +35,8 @@ namespace CatchupAI
             Console.WriteLine("MCTSAI ran {0} iterations in {1} ms", numIterations,
                 watch.ElapsedMilliseconds);
 
+            //root.DumpChildMeans();
+
             int bestLoc = root.GetBestMove();
             int worstLoc = root.GetWorstMove();
 

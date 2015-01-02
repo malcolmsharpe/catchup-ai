@@ -199,5 +199,32 @@ namespace CatchupAI
         {
             return children[loc];
         }
+
+        // Print hex grid showing all child means.
+        public void DumpChildMeans()
+        {
+            for (int y = 0; y < Game.maxY; ++y)
+            {
+                int minX = Math.Max(0, y - (Game.S - 1));
+                int leftNumSpaces = 6 * minX + 3 * (Game.S - 1 - y);
+                String leftSpaces = new String(' ', leftNumSpaces);
+                Console.Write("| " + leftSpaces);
+
+                for (int x = 0; x < Game.maxX; ++x)
+                {
+                    if (!Game.inBounds(x, y)) continue;
+                    var child = children[Game.toLoc(x, y)];
+                    if (child != null)
+                    {
+                        Console.Write(" {0,4:F2} ", child.GetMean());
+                    }
+                    else
+                    {
+                        Console.Write("  null  ");
+                    }
+                }
+                Console.WriteLine();
+            }
+        }
     }
 }

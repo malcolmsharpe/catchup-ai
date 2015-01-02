@@ -89,7 +89,7 @@ namespace CatchupAI
             rect.VerticalAlignment = VerticalAlignment.Top;
             rect.Height = rect.Width = Q;
             rect.Margin = hexMargin(x, y);
-            rect.Tag = game.toLoc(x, y);
+            rect.Tag = Game.toLoc(x, y);
             rect.MouseUp += new MouseButtonEventHandler(this.hex_MouseUp);
 
             Grid.SetRow(rect, 1);
