@@ -64,7 +64,11 @@ namespace CatchupAI
                     {
                         // UCB1 selection strategy.
                         double mean = children[move].GetMean();
-                        if (player == 1) mean = 1 - mean;
+
+                        // Branchless version of
+                        // if (player == 1) mean = 1 - mean;
+                        mean = mean + player * (1 - 2 * mean);
+
                         double criterion = mean +
                             Math.Sqrt(2.0 * logNumEvals / children[move].GetNumEvals());
 

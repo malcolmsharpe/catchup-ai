@@ -13,9 +13,9 @@ namespace CatchupAI
         public const int maxX = 2 * S - 1, maxY = maxX;
         public const int locLen = maxX * maxY;
 
-        public enum Stone { Empty, Black, White };
+        public enum Stone { Empty = 0, Black, White };
 
-        private Stone[,] stones;
+        private Stone[] stones;
 
         private IPlayer[] players;
         private int currentPlayer;
@@ -30,6 +30,7 @@ namespace CatchupAI
         private const int nd = 6;
         private int[] dx = { 1,  0, -1, -1, 0, 1 };
         private int[] dy = { 0, -1, -1,  0, 1, 1 };
+        private int[] dloc;
 
         FastUnion fu;
 
@@ -40,7 +41,13 @@ namespace CatchupAI
 
         public Game(IPlayer[] players)
         {
-            stones = new Stone[maxX, maxY];
+            dloc = new int[nd];
+            for (int d = 0; d < nd; ++d)
+            {
+                dloc[d] = toLoc(dx[d], dy[d]);
+            }
+
+            stones = new Stone[locLen];
             this.players = players;
 
             currentPlayer = 0;
@@ -58,12 +65,9 @@ namespace CatchupAI
         // Copy state to the other game, but not players.
         public void CopyTo(Game game)
         {
-            for (int x = 0; x < maxX; ++x)
+            for (int loc = 0; loc < locLen; ++loc)
             {
-                for (int y = 0; y < maxY; ++y)
-                {
-                    game.stones[x, y] = stones[x, y];
-                }
+                game.stones[loc] = stones[loc];
             }
             game.currentPlayer = currentPlayer;
             game.remainingPlays = remainingPlays;
@@ -75,7 +79,7 @@ namespace CatchupAI
 
         public Stone getStone(int x, int y)
         {
-            return stones[x, y];
+            return stones[toLoc(x, y)];
         }
 
         public bool getMayPass()
@@ -126,7 +130,7 @@ namespace CatchupAI
         public void userPlay(int x, int y)
         {
             if (players[currentPlayer] != null) return;
-            if (stones[x, y] != Stone.Empty) return;
+            if (getStone(x, y) != Stone.Empty) return;
 
             play(x, y);
         }
@@ -154,25 +158,26 @@ namespace CatchupAI
 
         private void play(int x, int y)
         {
-            Debug.Assert(stones[x, y] == Stone.Empty);
+            int loc = toLoc(x, y);
+            Debug.Assert(stones[loc] == Stone.Empty);
 
             Stone stone = currentPlayer == 0 ? Stone.Black : Stone.White;
-            stones[x, y] = stone;
+            stones[loc] = stone;
 
-            int i = toLoc(x, y);
             for (int k = 0; k < nd; ++k)
             {
-                int x2 = x + dx[k];
-                int y2 = y + dy[k];
-                if (!inBounds(x2, y2)) continue;
+                int loc2 = loc + dloc[k];
+                if (loc2 < 0 || locLen <= loc2) continue;
 
-                if (stone != stones[x2, y2]) continue;
+                // No need to check bounds, because hexes outside bounds will be Empty.
+                // This is happily true even if the x coordinate wraps around, because only the
+                // equator of the hex board is full-length.
+                if (stone != stones[loc2]) continue;
 
-                int j = toLoc(x2, y2);
-                fu.join(i, j);
+                fu.join(loc, loc2);
             }
 
-            int joinedSize = fu.querySize(i);
+            int joinedSize = fu.querySize(loc);
             if (joinedSize > catchupThreshold)
             {
                 triggerCatchup = true;
@@ -244,18 +249,14 @@ namespace CatchupAI
                 ret[p] = new List<int>();
             }
 
-            for (int x = 0; x < maxX; ++x)
+            for (int loc = 0; loc < locLen; ++loc)
             {
-                for (int y = 0; y < maxY; ++y)
-                {
-                    if (!inBounds(x, y)) continue;
-                    if (stones[x, y] == Stone.Empty) continue;
-                    int rp = fu.representativeSize(toLoc(x,y));
-                    if (rp == 0) continue;
+                if (stones[loc] == Stone.Empty) continue;
+                int rp = fu.representativeSize(loc);
+                if (rp == 0) continue;
 
-                    int p = stones[x, y] == Stone.Black ? 0 : 1;
-                    ret[p].Add(rp);
-                }
+                int p = stones[loc] == Stone.Black ? 0 : 1;
+                ret[p].Add(rp);
             }
 
             for (int p = 0; p < 2; ++p)
