@@ -56,6 +56,7 @@ namespace CatchupAI
                 // TODO: Optimize this selection.
                 double bestCriterion = -1;
                 int bestMove = -1;
+                double logNumEvals = Math.Log(numEvals);
 
                 for (int move = 0; move < children.Length; ++move)
                 {
@@ -65,7 +66,7 @@ namespace CatchupAI
                         double mean = children[move].GetMean();
                         if (player == 1) mean = 1 - mean;
                         double criterion = mean +
-                            Math.Sqrt(2.0 * Math.Log(numEvals) / children[move].GetNumEvals());
+                            Math.Sqrt(2.0 * logNumEvals / children[move].GetNumEvals());
 
                         if (criterion > bestCriterion)
                         {

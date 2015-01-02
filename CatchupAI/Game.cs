@@ -166,7 +166,7 @@ namespace CatchupAI
                 int y2 = y + dy[k];
                 if (!inBounds(x2, y2)) continue;
 
-                if (stones[x, y] != stones[x2, y2]) continue;
+                if (stone != stones[x2, y2]) continue;
 
                 int j = toLoc(x2, y2);
                 fu.join(i, j);
@@ -292,7 +292,7 @@ namespace CatchupAI
         // 'locLen' means pass
         public List<int> getLegalMoves(bool includePass)
         {
-            List<int> legals = new List<int>();
+            List<int> legals = new List<int>(emptyHexes + 1);
 
             for (int x = 0; x < maxX; ++x)
             {
