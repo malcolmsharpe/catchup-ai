@@ -38,14 +38,17 @@ namespace CatchupAI
             //root.DumpChildMeans();
 
             int bestLoc = root.GetBestMove();
+            int robustLoc = root.GetRobustMove();
             int worstLoc = root.GetWorstMove();
 
             var bestChild = root.GetChild(bestLoc);
+            var robustChild = root.GetChild(robustLoc);
             var worstChild = root.GetChild(worstLoc);
 
-            Console.WriteLine("MCTSAI spread from {0} ({1}) to {2} ({3})",
+            Console.WriteLine("MCTSAI spread from {0} ({1}) to {2} ({3})  [robust {4} ({5})]",
                 bestChild.GetMean(), bestChild.GetNumEvals(),
-                worstChild.GetMean(), worstChild.GetNumEvals());
+                worstChild.GetMean(), worstChild.GetNumEvals(),
+                robustChild.GetMean(), robustChild.GetNumEvals());
 
             game.ApplyMove(bestLoc);
         }

@@ -93,6 +93,9 @@ namespace CatchupAI
 
         private int simulate(Game game)
         {
+            // Catchup moves in simulation can be disabled here.
+            // game.AllowCatchups = false;
+
             // Get the empty hexes where moves can be made. Filling them in will finish the game.
             List<int> emptyLocs = game.getLegalMoves(false);
             shuffle(emptyLocs);
@@ -183,6 +186,28 @@ namespace CatchupAI
         public int GetBestMove()
         {
             return getExtremeMove(false);
+        }
+
+        public int GetRobustMove()
+        {
+            Debug.Assert(AnyExpanded());
+
+            int bestNumEvals = -1;
+            int robustLoc = -1;
+
+            foreach (int loc in expandedMoves)
+            {
+                int numEvals = children[loc].GetNumEvals();
+
+                if (numEvals > bestNumEvals)
+                {
+                    bestNumEvals = numEvals;
+                    robustLoc = loc;
+                }
+            }
+
+            Debug.Assert(robustLoc != -1);
+            return robustLoc;
         }
 
         public int GetWorstMove()

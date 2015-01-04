@@ -15,6 +15,8 @@ namespace CatchupAI
 
         public enum Stone { Empty = 0, Black, White };
 
+        public bool AllowCatchups = true;
+
         private Stone[] stones;
 
         private IPlayer[] players;
@@ -65,6 +67,7 @@ namespace CatchupAI
         // Copy state to the other game, but not players.
         public void CopyTo(Game game)
         {
+            game.AllowCatchups = AllowCatchups;
             for (int loc = 0; loc < locLen; ++loc)
             {
                 game.stones[loc] = stones[loc];
@@ -178,7 +181,7 @@ namespace CatchupAI
             }
 
             int joinedSize = fu.querySize(loc);
-            if (joinedSize > catchupThreshold)
+            if (AllowCatchups && joinedSize > catchupThreshold)
             {
                 triggerCatchup = true;
                 catchupThreshold = joinedSize;
