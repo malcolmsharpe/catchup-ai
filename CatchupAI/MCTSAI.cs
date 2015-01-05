@@ -10,10 +10,25 @@ namespace CatchupAI
     class MCTSAI
         : IPlayer
     {
+        public class NodeLink
+        {
+            public MCTSTreeNode node;
+            public NodeLink next;
+
+            public NodeLink(MCTSTreeNode node, NodeLink next) {
+                this.node = node;
+                this.next = next;
+            }
+        }
+
         public static Random rng = new Random();
 
         long TIME_MS = 2000;
         MCTSTreeNode root;
+
+        // For the RAVE heuristic:
+        // player -> move -> node (sibling of current path)
+        public NodeLink[][] raveTable;
 
         public void play(Game game)
         {
@@ -21,7 +36,7 @@ namespace CatchupAI
             watch.Start();
 
             Console.WriteLine("MCTSAI creating search tree");
-            root = new MCTSTreeNode();
+            root = new MCTSTreeNode(this);
 
             Game gameCopy = new Game();
 
@@ -30,6 +45,14 @@ namespace CatchupAI
             {
                 ++numIterations;
                 game.CopyTo(gameCopy);
+
+                // Clear RAVE table because it only updates siblings.
+                raveTable = new NodeLink[2][];
+                for (int player = 0; player < 2; ++player)
+                {
+                    raveTable[player] = new NodeLink[Game.locLen + 1];
+                }
+
                 root.select(gameCopy);
             }
             Console.WriteLine("MCTSAI ran {0} iterations in {1} ms", numIterations,
@@ -45,12 +68,20 @@ namespace CatchupAI
             var robustChild = root.GetChild(robustLoc);
             var worstChild = root.GetChild(worstLoc);
 
-            Console.WriteLine("MCTSAI spread from {0} ({1}) to {2} ({3})  [robust {4} ({5})]",
-                bestChild.GetMean(), bestChild.GetNumEvals(),
-                worstChild.GetMean(), worstChild.GetNumEvals(),
-                robustChild.GetMean(), robustChild.GetNumEvals());
+            Console.WriteLine("MCTSAI root moves:");
+            Console.Write("Best:    ");
+            bestChild.DumpStats();
+            Console.Write("Robust:  ");
+            robustChild.DumpStats();
+            Console.Write("Worst:   ");
+            worstChild.DumpStats();
 
             game.ApplyMove(bestLoc);
+        }
+
+        public void putNodeInRaveTable(MCTSTreeNode node, int player, int move)
+        {
+            raveTable[player][move] = new NodeLink(node, raveTable[player][move]);
         }
 
         public List<int> getExpectedResponse()

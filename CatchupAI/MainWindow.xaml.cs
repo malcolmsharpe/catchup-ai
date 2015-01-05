@@ -60,7 +60,7 @@ namespace CatchupAI
         {
             // TODO: Replace this with configuration.
             var players = new IPlayer[2];
-            players[1] = aiPlayer = new MCTSAI();
+            players[0] = aiPlayer = new MCTSAI();
 
             game = new Game(players);
         }

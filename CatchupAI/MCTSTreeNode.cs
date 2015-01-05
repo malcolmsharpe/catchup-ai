@@ -8,81 +8,120 @@ namespace CatchupAI
 {
     class MCTSTreeNode
     {
+        private struct AIAction
+        {
+            public int move;
+        }
+
+        const double EPS = 1e-8;
+        const double RaveK = 1000; // TODO: why?
+        const double RaveC = 2.0; // ...?
+
+        MCTSAI ai;
+
         int numEvals = 0;
         int totalOutcome = 0;
 
+        int numRave = 0;
+        int totalRave = 0;
+
         int player;
+        AIAction[] actions;
         MCTSTreeNode[] children;
-        List<int> unexpandedMoves;
-        List<int> expandedMoves;
+
+        public MCTSTreeNode(MCTSAI ai)
+        {
+            this.ai = ai;
+        }
+
+        public void ApplyRaveOutcome(int outcome)
+        {
+            ++numRave;
+            totalRave += outcome;
+        }
 
         // Returns the outcome.
         // 1: Black win
         // 0: White win
         public int select(Game game)
         {
-            if (children == null)
+            if (actions == null)
             {
                 // Initializing is delayed until first selection.
                 player = game.getCurrentPlayer();
 
+                List<int> moves = game.getLegalMoves(true);
+                actions = new AIAction[moves.Count];
                 Debug.Assert(children == null);
-                children = new MCTSTreeNode[Game.locLen + 1]; // locLen means pass
+                children = new MCTSTreeNode[moves.Count];
 
-                Debug.Assert(unexpandedMoves == null);
-                unexpandedMoves = game.getLegalMoves(true);
+                for (int i = 0; i < moves.Count; ++i)
+                {
+                    actions[i].move = moves[i];
+                    children[i] = new MCTSTreeNode(ai);
+                }
+            }
 
-                Debug.Assert(expandedMoves == null);
-                expandedMoves = new List<int>();
+            // TODO: Optimize this selection.
+            double bestCriterion = -1;
+            int bestI = -1;
+            int numBest = 0;
+            double logNumEvals = Math.Log(numEvals);
+
+            int childNumRave = 0;
+            for (int i = 0; i < children.Length; ++i)
+            {
+                childNumRave += children[i].numRave;
+                ai.putNodeInRaveTable(children[i], game.getCurrentPlayer(), actions[i].move);
+            }
+
+            for (int i = 0; i < children.Length; ++i)
+            {
+                double criterion = children[i].GetMixedCriterion(player, numEvals, logNumEvals, childNumRave);
+
+                if (criterion > bestCriterion)
+                {
+                    bestCriterion = criterion;
+                    bestI = i;
+                    numBest = 1;
+                }
+                else if (criterion + EPS >= bestCriterion)
+                {
+                    Debug.Assert(numBest >= 1);
+                    ++numBest;
+
+                    // Every equal candidate should be selected with equal probability.
+                    // Note that in the early phases when each child has been evaluated
+                    // either zero or a small number of times, ties will in fact occur
+                    // most of the time. For example, every child that has never been
+                    // visited has equal criterion.
+                    if (MCTSAI.rng.Next(numBest) == 0)
+                    {
+                        bestCriterion = criterion;
+                        bestI = i;
+                    }
+                }
             }
 
             int outcome;
-            if (unexpandedMoves.Count > 0)
+            if (bestI == -1)
             {
-                int move = popRandomMove(unexpandedMoves);
-                expandedMoves.Add(move);
-                children[move] = new MCTSTreeNode();
-
-                game.ApplyMove(move);
-                outcome = children[move].simulate(game);
-            }
-            else if (expandedMoves.Count == 0)
-            {
+                // This is the case where there is no child, i.e., there is no legal move.
                 Debug.Assert(game.isGameOver());
                 outcome = 1 - game.GetWinner();
             }
             else
             {
-                // TODO: Optimize this selection.
-                double bestCriterion = -1;
-                int bestMove = -1;
-                double logNumEvals = Math.Log(numEvals);
+                game.ApplyMove(actions[bestI].move);
 
-                for (int move = 0; move < children.Length; ++move)
+                if (children[bestI].GetNumEvals() == 0)
                 {
-                    if (children[move] != null)
-                    {
-                        // UCB1 selection strategy.
-                        double mean = children[move].GetMean();
-
-                        // Branchless version of
-                        // if (player == 1) mean = 1 - mean;
-                        mean = mean + player * (1 - 2 * mean);
-
-                        double criterion = mean +
-                            Math.Sqrt(2.0 * logNumEvals / children[move].GetNumEvals());
-
-                        if (criterion > bestCriterion)
-                        {
-                            bestCriterion = criterion;
-                            bestMove = move;
-                        }
-                    }
+                    outcome = children[bestI].simulate(game);
                 }
-                Debug.Assert(bestMove != -1);
-
-                game.ApplyMove(bestMove);
-                outcome = children[bestMove].select(game);
+                else
+                {
+                    outcome = children[bestI].select(game);
+                }
             }
 
             numEvals++;
@@ -100,14 +139,26 @@ namespace CatchupAI
             List<int> emptyLocs = game.getLegalMoves(false);
             shuffle(emptyLocs);
 
-            while (!game.isGameOver())
+            int[] turnPlayer = new int[emptyLocs.Count];
+            for (int i = 0; i < emptyLocs.Count; ++i)
             {
-                Debug.Assert(emptyLocs.Count > 0);
-                game.ApplyMove(popMove(emptyLocs));
+                Debug.Assert(!game.isGameOver());
+                turnPlayer[i] = game.getCurrentPlayer();
+                game.ApplyMove(emptyLocs[i]);
             }
-            Debug.Assert(emptyLocs.Count == 0);
 
             int outcome = 1 - game.GetWinner();
+
+            // Apply outcome to RAVE estimates.
+            for (int i = 0; i < emptyLocs.Count; ++i)
+            {
+                int player = turnPlayer[i];
+                int loc = emptyLocs[i];
+                for (MCTSAI.NodeLink link = ai.raveTable[player][loc]; link != null; link = link.next)
+                {
+                    link.node.ApplyRaveOutcome(outcome);
+                }
+            }
 
             numEvals++;
             totalOutcome += outcome;
@@ -126,24 +177,57 @@ namespace CatchupAI
             }
         }
 
-        private static int popRandomMove(List<int> moves)
+        // Mix UCB1 and RAVE.
+        public double GetMixedCriterion(int parentPlayer, int parentNumEvals,
+            double parentLogNumEvals, int parentNumRave)
         {
-            int moveIndex = MCTSAI.rng.Next(moves.Count);
-            int move = moves[moveIndex];
-            moves[moveIndex] = moves[moves.Count - 1];
-            moves.RemoveAt(moves.Count - 1);
-            return move;
+            double ucb1 = GetUCB1Criterion(parentPlayer, parentLogNumEvals);
+            if (totalRave == 0) return ucb1;
+
+            double rave = GetRAVECriterion(parentPlayer, parentNumRave);
+
+            double beta = Math.Sqrt(RaveK / (3*parentNumEvals + RaveK));
+            return beta * rave + (1 - beta) * ucb1;
         }
 
-        private static int popMove(List<int> moves)
+        public double GetUCB1Criterion(int parentPlayer, double parentLogNumEvals)
         {
-            int move = moves[moves.Count - 1];
-            moves.RemoveAt(moves.Count - 1);
-            return move;
+            if (numEvals == 0)
+            {
+                return double.PositiveInfinity;
+            }
+
+            // UCB1 selection strategy.
+            double mean = GetMean();
+
+            // Branchless version of
+            // if (player == 1) mean = 1 - mean;
+            mean = mean + parentPlayer * (1 - 2 * mean);
+
+            return mean +
+                Math.Sqrt(2.0 * parentLogNumEvals / GetNumEvals());
+        }
+
+        public double GetRAVECriterion(int parentPlayer, int parentNumRave)
+        {
+            Debug.Assert(totalRave > 0);
+
+            // RAVE selection strategy.
+            double mean = GetRAVE();
+            mean = mean + parentPlayer * (1 - 2 * mean);
+
+            return RaveC * Math.Sqrt(Math.Log(parentNumRave) / numRave);
+        }
+
+        public double GetRAVE()
+        {
+            Debug.Assert(totalRave > 0);
+            return totalRave / (double)numRave;
         }
 
         public double GetMean()
         {
+            Debug.Assert(numEvals > 0);
             return totalOutcome / (double)numEvals;
         }
 
@@ -154,7 +238,7 @@ namespace CatchupAI
 
         public bool AnyExpanded()
         {
-            return expandedMoves != null && expandedMoves.Count > 0;
+            return children.Length > 0 && numEvals >= 2;
         }
 
         // Gets best move when invert=false.
@@ -166,16 +250,18 @@ namespace CatchupAI
             double bestSubjectiveMean = -1;
             int extrLoc = -1;
 
-            foreach (int loc in expandedMoves)
+            for (int i = 0; i < children.Length; ++i)
             {
-                double mean = children[loc].GetMean();
+                if (children[i].GetNumEvals() == 0) continue;
+
+                double mean = children[i].GetMean();
                 if (player == 1) mean = 1 - mean;
                 if (invert) mean = 1 - mean;
 
                 if (mean > bestSubjectiveMean)
                 {
                     bestSubjectiveMean = mean;
-                    extrLoc = loc;
+                    extrLoc = actions[i].move;
                 }
             }
 
@@ -195,14 +281,14 @@ namespace CatchupAI
             int bestNumEvals = -1;
             int robustLoc = -1;
 
-            foreach (int loc in expandedMoves)
+            for (int i = 0; i < children.Length; ++i)
             {
-                int numEvals = children[loc].GetNumEvals();
+                int numEvals = children[i].GetNumEvals();
 
                 if (numEvals > bestNumEvals)
                 {
                     bestNumEvals = numEvals;
-                    robustLoc = loc;
+                    robustLoc = actions[i].move;
                 }
             }
 
@@ -222,7 +308,15 @@ namespace CatchupAI
 
         public MCTSTreeNode GetChild(int loc)
         {
-            return children[loc];
+            for (int i = 0; i < children.Length; ++i)
+            {
+                if (actions[i].move == loc)
+                {
+                    return children[i];
+                }
+            }
+            Debug.Assert(false);
+            return null;
         }
 
         // Print hex grid showing all child means.
@@ -238,7 +332,16 @@ namespace CatchupAI
                 for (int x = 0; x < Game.maxX; ++x)
                 {
                     if (!Game.inBounds(x, y)) continue;
-                    var child = children[Game.toLoc(x, y)];
+
+                    MCTSTreeNode child = null;
+                    for (int i = 0; i < children.Length; ++i)
+                    {
+                        if (actions[i].move == Game.toLoc(x, y))
+                        {
+                            child = children[i];
+                        }
+                    }
+
                     if (child != null)
                     {
                         Console.Write(" {0,4:F2} ", child.GetMean());
@@ -250,6 +353,17 @@ namespace CatchupAI
                 }
                 Console.WriteLine();
             }
+        }
+
+        public void DumpStats()
+        {
+            String raveStr = "n/a";
+            if (numRave > 0)
+            {
+                raveStr = GetRAVE().ToString();
+            }
+            Console.WriteLine("mean {0};  visits {1};  rave {2};  raves {3}",
+                GetMean(), numEvals, raveStr, numRave);
         }
     }
 }
